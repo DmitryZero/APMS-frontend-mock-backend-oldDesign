@@ -27,12 +27,13 @@
       </div>
       <div class="send">
         <input id="send_1" type="submit" class="btn btn-outline-secondary input_submit" name="send" value="Войти"
-          onclick="sendAuthorizationForm()">
+          onclick="sendAuthorizationForm(document.getElementById('login_1').value, document.getElementById('password_1').value)">
       </div>
     </div>
   </div>
 
-  <script src="../scriptsjs/fetchScripts.js"></script>
+  <script src="../scriptsjs/generators.js"></script>
+  <script src="../scriptsjs/fetchScripts.js"></script>  
 </body>
 
 </html>

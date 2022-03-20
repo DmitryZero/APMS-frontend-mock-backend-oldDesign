@@ -1,4 +1,13 @@
-var URL_link = "http://localhost:8080";
+const mockBackEndURL = "https://api.jsonbin.io/v3/b";
+const projectProposalRoute = "/6231ee6c7caf5d67836ab769";
+const userRoute = "/6237190aa703bb6749303650";
+const projectRoute = "/6231ee887caf5d67836ab77f";
+const stageRoute = "/6231ee6c7caf5d67836ab769";
+const cardRoute = "/6231ee6c7caf5d67836ab769";
+const commentRoute = "/6231ee6c7caf5d67836ab769";
+const X_Master_Key = "$2b$10$lR/CK/e1aFIyK0RYtQ3D9OtJucuv6VX9d62GHx5EhPF9APlRKZmQ2";
+
+
 var dateWithoutTime = new Intl.DateTimeFormat("ru", {
   dateStyle: "short",
   formatMatcher: "best fit"
@@ -10,31 +19,31 @@ var dictOfStatus = {
   "USER": "Пользователь"
 }
 
+async function GetAllProjects(){
+  let response = await fetch(`${mockBackEndURL}${projectRoute}`, {
+    method: 'GET',
+    headers: {
+      "X-Master-Key": X_Master_Key
+    }
+  });
+  if (response.ok) {
+    let result = await response.json();
+    return result;
+  }
+  else {
+    console.log(response);
+    return;
+  }
+}
+
 //Функции общего назначения
 //===================================================================================================//
 //Проверка токена
 async function checkToken() {
-  var myHeaders = new Headers();
-  myHeaders.append("Authorization", localStorage.getItem('token'));
-  var requestOptions = {
-    method: 'GET',
-    headers: myHeaders,
-    redirect: 'follow'
-  };
-
-  const status = await fetch(URL_link + "/user/self", requestOptions)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error('Ошибочный запрос');
-      }
-      return true;
-    })
-    .catch(error => {
-      console.log('error', error);
-      alert('Нет токена');
-      return false;
-    });
-  return status;
+  if (!localStorage.getItem('userInfo')) {
+    console.log("Нет токена");
+    document.location.href = "authorization.html";
+  }
 }
 //Возвращает данные пользователя учитывая токен в sessionstorage
 async function GetUser(tokenOfUser) {
@@ -207,34 +216,25 @@ async function Send_Registration_Form(email, password, first_name, last_name, pa
     })
     .catch(error => console.log('error', error))
 }
-async function sendAuthorizationForm() {
-  var myHeaders = new Headers();
-  myHeaders.append("login", document.getElementById('login_1').value);
-  myHeaders.append("password", document.getElementById('password_1').value);
-  myHeaders.append("Authorization", "");
-
-  var requestOptions = {
+async function sendAuthorizationForm(login, password) {
+  let response = await fetch(`${mockBackEndURL}${userRoute}`, {
     method: 'GET',
-    headers: myHeaders,
-    redirect: 'follow'
-  };
-
-  fetch(URL_link + '/auth/sign_in', requestOptions)
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error('Ошибочный запрос');
-      }
-      return response.text();
-    })
-    .then(async (result) => {
-      localStorage.setItem('token', result);
-      var user = await GetUser(result);
-    })
-    .then(() => document.location.href = "account.html")
-    .catch(error => {
-      console.log('error', error);
-      alert('Ошибочный запрос');
-    });
+    headers: {
+      "X-Master-Key": X_Master_Key
+    }
+  });
+  if (response.ok) {
+    let result = await response.json();
+    let user = findUserByLoginAndPassword(login, password, result["record"]["Users"]);
+    if (user) {
+      localStorage.setItem('userInfo', JSON.stringify(user));
+      document.location.href = "account.html"
+    }
+  }
+  else {
+    console.log(response);
+    return;
+  }
 }
 //===================================================================================================//
 
@@ -243,32 +243,31 @@ async function sendAuthorizationForm() {
 //===================================================================================================//
 //Загружает информацию о пользователе на странице личного кабинета
 async function LoadInformationOfUserForAccount() {
-  var result = await GetUser(localStorage.getItem('token'));
+  let user = JSON.parse(localStorage.getItem('userInfo'));
+  
+  document.getElementById('full_name').innerHTML = `${user.lastName} ${user.firstName} ${user.patronymic}`;
+  document.getElementById('work_place').innerText += `: ${user.workPlace || 'не указано'}`;
+  document.getElementById('status').innerText += `: ${user.status || 'не указано'}`;
+  document.getElementById('birthday').innerText += `: ${user.birthDate || 'не указано'}`;
+  document.getElementById('phone').innerText += `: ${user.phoneNumber || 'не указано'}`;
+  document.getElementById('role').innerText += `: ${dictOfStatus[user.role] || 'не указано'}`;
 
-  if (result['lastName'] && result['firstName']) {
-    document.getElementById('full_name').innerText = result['lastName'] + ' ' + result['firstName'];
-    if (result['patronymic']) document.getElementById('full_name').innerText += ' ' + result['patronymic'];
-  }
-  else document.getElementById('full_name').value = 'Фамилия' + ' ' + 'Имя' + ' ' + 'Отчество';
-
-  document.getElementById('work_place').innerText += ': ' + (result['workPlace'] ?? 'не указано');
-  document.getElementById('status').innerText += ': ' + (result['status'] ?? 'не указано');
-  if (result['birthDate'] != null) document.getElementById('birthday').innerText += ': ' + dateWithoutTime.format(Date.parse(result['birthDate']));
-  document.getElementById('phone').innerText += ': ' + (result['phoneNumber'] ?? 'не указано');
-  document.getElementById('role').innerText += ': ' + (dictOfStatus[result['role']] ?? 'не указано');
+  let allProjectList = (await GetAllProjects())["record"]["Projects"];
+  let foundProjectList = [...findProjectsById(user.ProjectList, allProjectList)];
+  
 
   let container = document.querySelector("#projects-list");
-  for (var i = 0; i < Object.keys(result['projectUuidList']).length; i++) {
-    var project = await GetProject(result['projectUuidList'][i]);
+  for (let i = 0; i < foundProjectList.length; i++) {
     let liElement = document.createElement('li');
-    liElement.insertAdjacentHTML('beforeend', '<div class = "tempObject">' + project['name'] + '</div>');
-    liElement.dataset.uuidOfProject = result['projectUuidList'][i];
-    liElement.addEventListener('click', () => {
-      localStorage.setItem('tokenOfProject', liElement.dataset.uuidOfProject);
-      document.location.href = "project.html";
-    });
-
+    liElement.insertAdjacentHTML('beforeend', `<div class = "tempObject">${foundProjectList[i].name}</div>`);
+    liElement.dataset.uuidOfProject = foundProjectList[i].projectId;    
     container.appendChild(liElement);
+
+    liElement.addEventListener('click', () => {
+      // localStorage.setItem('tokenOfProject', liElement.dataset.uuidOfProject);
+      // document.location.href = "project.html";
+      alert('Клик');
+    });
   }
 }
 async function LoadInformationOfUserForEditAccout() {
@@ -541,7 +540,7 @@ async function LoadProjectInformation() {
       userRole = userParams['role'];
       if (localStorage.getItem('token') == result['userCaptain']) userRole = "Captain";
       if (localStorage.getItem('token') == result['projectManager']) userRole = "Manager";
-      
+
       if (userRole == "Captain" || userRole == "Manager") document.getElementById('AddParticipantsOfProject').removeAttribute('style');
       if (userRole != "CURATOR") document.getElementById('add-column-btn').removeAttribute('style');
 
@@ -628,7 +627,7 @@ async function EditStage(tokenOfStage, newName) {
     redirect: 'follow'
   };
 
-  fetch(URL_link + "/stage/" + tokenOfStage +  "?projectUuid=" + localStorage.getItem('tokenOfProject'), requestOptions)
+  fetch(URL_link + "/stage/" + tokenOfStage + "?projectUuid=" + localStorage.getItem('tokenOfProject'), requestOptions)
     .then((response) => {
       if (!response.ok) {
         throw new Error('Ошибочный запрос');

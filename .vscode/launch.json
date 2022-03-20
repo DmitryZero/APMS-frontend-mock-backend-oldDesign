@@ -5,15 +5,11 @@
     "version": "0.2.0",
     "configurations": [       
         {
-            "type": "chrome",
+            "name": "Отладка",
             "request": "launch",
-            "name": "Launch Chrome",
-            "runtimeArgs": [
-                "--disable-web-security"
-              ],
-            "url": "http://127.0.0.1:5501",
+            "type": "pwa-chrome",
+            "url": "http://localhost:5501",
             "webRoot": "${workspaceFolder}"
         }
-
     ]
 }
